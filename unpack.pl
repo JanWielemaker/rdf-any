@@ -36,7 +36,8 @@
 %		  - filter(Filter)
 %		  The indicated content filter was applied.
 %		  - archive_entry{}, where the keys provide all
-%		  solutions of archive_header_property/2.
+%		  solutions of archive_header_property/2 and the
+%		  key =name= provides the name of the archive entry.
 %
 %	@arg	Spec is a stream, URL or file name. If Spec is a stream,
 %		it is _not_ closed after processing.
@@ -72,6 +73,13 @@ open_input(URL, In, Meta, close(In)) :-
 	    Meta = file{path:File},
 	    open(File, read, In, [type(binary)])
 	).
+open_input(URL, In, file{path:File}, close(In)) :-
+	uri_file_name(URL, File), !,
+	open(File, In, [type(binary)]).
+open_input(Spec, In, file{path:Path}, close(In)) :-
+	compound(Spec), !,
+	absolute_file_name(Spec, Path, [access(read)]),
+	open(Path, read, In, [type(binary)]).
 open_input(File, In, file{path:File}, close(In)) :-
 	exists_file(File),
 	open(File, read, In, [type(binary)]).
