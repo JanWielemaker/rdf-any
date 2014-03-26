@@ -129,7 +129,8 @@ archive_content(Ar, Entry, PipeLine, PipeTail) :-
 	    (   Pipe.filetype == file
 	    ->	archive_open_entry(Ar, Entry0),
 		(   Name == data, Pipe.format == raw
-		->  !, RestPipe = PipeTail
+		->  !, RestPipe = PipeTail,
+		    Entry = Entry0
 		;   RestPipe = [ Pipe | RestPipe1 ],
 		    call_cleanup(content(Entry0, Entry, RestPipe1, PipeTail),
 				 close(Entry0))
