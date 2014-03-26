@@ -1,8 +1,7 @@
 :- module(rdf_detect,
-	  [ rdf_format/3		% +Stream, -ContentType, +Options
+	  [ rdf_guess_format/3		% +Stream, -ContentType, +Options
 	  ]).
 :- use_module(library(semweb/rdf_db)).
-:- use_module(library(semweb/rdf_ntriples)).
 :- use_module(library(sgml)).
 :- use_module(library(memfile)).
 :- use_module(library(option)).
@@ -11,28 +10,30 @@
 /** <module> Detect RDF document format from stream content
 */
 
-%%	rdf_format(+Stream, -ContentType, +Options) is semidet.
+%%	rdf_guess_format(+Stream, -ContentType, +Options) is semidet.
 %
 %	True when Stream is  thought  to   contain  RDF  data  using the
 %	indicated content type.  Options processed:
 %
 %	  - look_ahead(+Bytes)
 %	  Look ahead the indicated amount
+%	  - format(+Format)
+%	  Guessed format from media type and/or file name
 
-rdf_format(Stream, ContentType, Options) :-
+rdf_guess_format(Stream, ContentType, Options) :-
 	option(look_ahead(Bytes), Options, 2000),
 	peek_string(Stream, Bytes, String),
 	(   string_codes(String, Codes),
-	    phrase(rdf_content_type(ContentType), Codes, _)
+	    phrase(rdf_content_type(ContentType, Options), Codes, _)
 	->  true
-	;   open_binary_string_stream(String, Stream),
-	    guess_xml_type(Stream, ContentType)
+	;   open_binary_string_stream(String, StartStream),
+	    guess_xml_type(StartStream, ContentType)
 	).
 
-rdf_content_type(ContentType) -->
-	turtle_like(ContentType), !.
+rdf_content_type(ContentType, Options) -->
+	turtle_like(ContentType, Options), !.
 
-%%	turtle_like(-ContentType)// is semidet.
+%%	turtle_like(-ContentType, +Options)// is semidet.
 %
 %	True if the start of the   input matches a turtle-like language.
 %	There are four of them:
@@ -45,35 +46,77 @@ rdf_content_type(ContentType) -->
 %	The first three can all be handled   by the turtle parser, so it
 %	doesn't matter too much.
 
-turtle_like(ContentType) -->
+turtle_like(ContentType, Options) -->
 	blank, !, blanks,
-	turtle_like(ContentType).
-turtle_like(ContentType) -->
+	turtle_like(ContentType, Options).
+turtle_like(ContentType, Options) -->
 	"#", !, skip_line,
-	turtle_like(ContentType).
-turtle_like(turtle) -->			% or TRiG
-	"@", icase_keyword(Keyword), {turtle_keyword(Keyword)}, !.
-turtle_like(turtle) -->			% or TRiG
-	"PREFIX", blank, !.
-turtle_like(turtle) -->			% or TRiG
-	"BASE", blank, !.
-turtle_like(Format) -->
+	turtle_like(ContentType, Options).
+turtle_like(Format, Options) -->
+	"@", icase_keyword(Keyword), {turtle_keyword(Keyword)}, !,
+	turtle_or_trig(Format, Options).
+turtle_like(Format, Options) -->
+	"PREFIX", blank, !,
+	turtle_or_trig(Format, Options).
+turtle_like(Format, Options) -->
+	"BASE", blank, !,
+	turtle_or_trig(Format, Options).
+turtle_like(Format, Options) -->
 	iriref, nt_white, iriref, nt_white, nt_object,
 	nt_white,
 	(   "."
 	->  nt_end,
-	    {Format = ntriples}
+	    nt_turtle_like(Format, Options)
 	;   iriref, nt_white, nt_end
 	->  {Format = nquads}
 	).
-turtle_like(turtle) -->			% starts with a blank node
-	"[", !.
-turtle_like(turtle) -->			% starts with a collection
-	"(", !.
-
+turtle_like(Format, Options) -->		% starts with a blank node
+	"[", !,
+	turtle_or_trig(Format, Options).
+turtle_like(Format, Options) -->			% starts with a collection
+	"(", !,
+	turtle_or_trig(Format, Options).
 
 turtle_keyword(base).
 turtle_keyword(prefix).
+
+%%	turtle_or_trig(-Format, +Options)//
+%
+%	The file starts with a Turtle construct.   It can still be TriG.
+%	We trust the content type and otherwise  we assume TriG if there
+%	is a "{" in the first section of the file.
+
+turtle_or_trig(Format, Options) -->
+	{ option(format(Format), Options),
+	  turtle_or_trig(Format)
+	}, !.
+turtle_or_trig(Format, _Options) -->
+	(   ..., "{"
+	->  {Format = trig}
+	;   {Format = turtle}
+	).
+
+turtle_or_trig(turtle).
+turtle_or_trig(trig).
+
+... --> "" | [_], ... .
+
+%%	nt_turtle_like(-Format, +Options)//
+%
+%	We found a fully qualified triple.  This still can be Turtle,
+%	TriG, ntriples and nquads.
+
+nt_turtle_like(Format, Options) -->
+	{ option(format(Format), Options),
+	  nt_turtle_like(Format)
+	}, !.
+nt_turtle_like(ntriples, _) -->
+	"".
+
+nt_turtle_like(turtle).
+nt_turtle_like(trig).
+nt_turtle_like(ntriples).
+nt_turtle_like(nquads).
 
 iriref --> "<", iri_codes, ">".
 
