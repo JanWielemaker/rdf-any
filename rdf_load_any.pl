@@ -55,7 +55,15 @@ load_stream(Stream, Location, Options) :-
 
 load_stream_(Stream, Location, Options) :-
 	location_base(Location, Base),
-	rdf_format(Stream, Format, Options),
+	(   (   file_name_extension(_, Ext, Base),
+		Ext \== '',
+		guess_format(Location.put(ext, Ext), DefFormat)
+	    ;   guess_format(Location, DefFormat)
+	    )
+	->  Options1 = [format(DefFormat)|Options]
+	;   Options1 = Options
+	),
+	rdf_guess_format(Stream, Format, Options1),
 	rdf_load(stream(Stream),
 		 [ format(Format),
 		   base_uri(Base)
@@ -95,4 +103,23 @@ location_suffix([Archive|T], Suffix) :-
 	->  atomic_list_concat([Archive.name, Suffix0], /, Suffix)
 	;   Suffix = Archive.name
 	).
+
+guess_format(Location, Format) :-
+	rdf_content_type(Location.get(content_type), Format), !.
+guess_format(Location, Format) :-
+	rdf_db:rdf_file_type(Location.get(ext), Format).
+
+rdf_content_type('text/rdf',		  xml).
+rdf_content_type('text/xml',		  xml).
+rdf_content_type('text/rdf+xml',	  xml).
+rdf_content_type('application/rdf+xml',	  xml).
+rdf_content_type('application/x-turtle',  turtle).
+rdf_content_type('application/turtle',	  turtle).
+rdf_content_type('application/trig',	  trig).
+rdf_content_type('application/n-triples', ntriples).
+rdf_content_type('application/n-quads',   nquads).
+rdf_content_type('text/turtle',		  turtle).
+rdf_content_type('text/rdf+n3',		  turtle).	% Bit dubious
+rdf_content_type('text/html',		  html).
+rdf_content_type('application/xhtml+xml', xhtml).
 
