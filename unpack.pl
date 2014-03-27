@@ -43,15 +43,15 @@
 %		it is _not_ closed after processing.
 
 unpack(Spec, Stream, Location) :-
-	open_input(Spec, In, Meta, Close),
+	open_input(Spec, In, Meta, CloseStream),
 	Location = Meta.put(data, Data),
-	call_cleanup(content(In, Stream, Data), Close).
+	content(In, Stream, Data, CloseStream).
 
 
-open_input(stream(In), In, stream{stream:In}, true).
-open_input(In, In, stream{stream:In}, true) :-
+open_input(stream(In), In, stream{stream:In}, false).
+open_input(In, In, stream{stream:In}, false) :-
 	is_stream(In), !.
-open_input(URL, In, Meta, close(In)) :-
+open_input(URL, In, Meta, true) :-
 	uri_components(URL, Components),
 	uri_data(scheme, Components, Scheme),
 	nonvar(Scheme),
@@ -73,14 +73,14 @@ open_input(URL, In, Meta, close(In)) :-
 	    Meta = file{path:File},
 	    open(File, read, In, [type(binary)])
 	).
-open_input(URL, In, file{path:File}, close(In)) :-
+open_input(URL, In, file{path:File}, true) :-
 	uri_file_name(URL, File), !,
 	open(File, In, [type(binary)]).
-open_input(Spec, In, file{path:Path}, close(In)) :-
+open_input(Spec, In, file{path:Path}, true) :-
 	compound(Spec), !,
 	absolute_file_name(Spec, Path, [access(read)]),
 	open(Path, read, In, [type(binary)]).
-open_input(File, In, file{path:File}, close(In)) :-
+open_input(File, In, file{path:File}, true) :-
 	exists_file(File),
 	open(File, read, In, [type(binary)]).
 
@@ -109,12 +109,15 @@ url_meta_pairs([Name=Value|T0], [Name-Value|T]) :- !,
 %		  - filter(Name)
 %		  - archive(Member, Format)
 
-content(In, Entry, PipeLine) :-
-	content(In, Entry, PipeLine, []).
+content(In, Entry, PipeLine, CloseStream) :-
+	content(In, Entry, CloseStream, PipeLine, []).
 
-content(In, Entry, PipeLine, PipeTail) :-
+content(In, Entry, CloseStream, PipeLine, PipeTail) :-
 	setup_call_cleanup(
-	    archive_open(stream(In), Ar, [format(all),format(raw)]),
+	    archive_open(stream(In), Ar,
+			 [ format(all), format(raw),
+			   close_parent(CloseStream)
+			 ]),
 	    archive_content(Ar, Entry, PipeLine, PipeTail),
 	    archive_close(Ar)).
 
