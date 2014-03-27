@@ -83,7 +83,7 @@ location_base(Location, Base) :-
 
 location_base_base(Location, Location.get(url)) :- !.
 location_base_base(Location, Base) :-
-	uri_file_name(Base, Location.get(file)), !.
+	uri_file_name(Base, Location.get(path)), !.
 location_base_base(Location, Base) :-
 	stream_property(Location.get(stream), file_name(FileName)), !,
 	(   uri_is_global(FileName)

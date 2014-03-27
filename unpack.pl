@@ -48,8 +48,8 @@ unpack(Spec, Stream, Location) :-
 	call_cleanup(content(In, Stream, Data), Close).
 
 
-open_input(stream(In), In, stream{}, true).
-open_input(In, In, stream{}, true) :-
+open_input(stream(In), In, stream{stream:In}, true).
+open_input(In, In, stream{stream:In}, true) :-
 	is_stream(In), !.
 open_input(URL, In, Meta, close(In)) :-
 	uri_components(URL, Components),
