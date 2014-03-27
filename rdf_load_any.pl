@@ -31,6 +31,7 @@
 	  [ rdf_load_any/1,		% +Input
 	    rdf_load_any/2		% +Input, +Options
 	  ]).
+:- use_module(library(thread)).
 :- use_module(library(uri)).
 :- use_module(library(gensym)).
 :- use_module(library(semweb/rdf_db)).
@@ -45,6 +46,12 @@
 rdf_load_any(Input) :-
 	rdf_load_any(Input, []).
 rdf_load_any(Input, Options) :-
+	is_list(Input), !,
+	concurrent_maplist(rdf_load_any_1(Options), Input).
+rdf_load_any(Input, Options) :-
+	rdf_load_any_1(Options, Input).
+
+rdf_load_any_1(Options, Input) :-
 	forall(unpack(Input, Stream, Location),
 	       call_cleanup(load_stream(Stream, Location, Options),
 			    close(Stream))).
