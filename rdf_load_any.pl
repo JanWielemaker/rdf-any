@@ -31,6 +31,8 @@
 	  [ rdf_load_any/1,		% +Input
 	    rdf_load_any/2		% +Input, +Options
 	  ]).
+:- use_module(library(lists)).
+:- use_module(library(option)).
 :- use_module(library(thread)).
 :- use_module(library(uri)).
 :- use_module(library(gensym)).
@@ -41,27 +43,48 @@
 %%	rdf_load_any(+Input) is det.
 %%	rdf_load_any(+Input, +Options) is det.
 %
-%	Try to load RDF from Input.
+%	Try to load RDF from Input. Options are passed tp rdf_load/2. In
+%	addition, these options are processed:
+%
+%	  * loaded(-Pairs)
+%	  Pairs is a list of SourceURL-Graph
 
 rdf_load_any(Input) :-
 	rdf_load_any(Input, []).
+
 rdf_load_any(Input, Options) :-
 	is_list(Input), !,
-	concurrent_maplist(rdf_load_any_1(Options), Input).
+	concurrent_maplist(rdf_load_any_1(Options), Input, PairsList),
+	append(PairsList, Pairs),
+	(   option(loaded(Pairs0), Options)
+	->  Pairs0 = Pairs
+	;   true
+	).
 rdf_load_any(Input, Options) :-
-	rdf_load_any_1(Options, Input).
+	rdf_load_any_1(Options, Input, Pairs),
+	(   option(loaded(Pairs0), Options)
+	->  Pairs0 = Pairs
+	;   true
+	).
 
-rdf_load_any_1(Options, Input) :-
-	forall(unpack(Input, Stream, Location),
-	       call_cleanup(load_stream(Stream, Location, Options),
-			    close(Stream))).
 
-load_stream(Stream, Location, Options) :-
-	catch(load_stream_(Stream, Location, Options), E,
+rdf_load_any_1(Options, Input, Pairs) :-
+	findall(Base-Graph,
+		( unpack(Input, Stream, Location),
+		  location_base(Location, Base),
+		  call_cleanup(load_stream(Stream, Location, Base,
+					   [ graph(Graph)
+					   | Options
+					   ]),
+			       close(Stream))
+		),
+		Pairs).
+
+load_stream(Stream, Location, Base, Options) :-
+	catch(load_stream_(Stream, Location, Base, Options), E,
 	      print_message(warning, E)).
 
-load_stream_(Stream, Location, Options) :-
-	location_base(Location, Base),
+load_stream_(Stream, Location, Base, Options) :-
 	(   (   file_name_extension(_, Ext, Base),
 		Ext \== '',
 		guess_format(Location.put(ext, Ext), DefFormat)
@@ -70,12 +93,18 @@ load_stream_(Stream, Location, Options) :-
 	->  Options1 = [format(DefFormat)|Options]
 	;   Options1 = Options
 	),
-	rdf_guess_format(Stream, Format, Options1),
-	rdf_load(stream(Stream),
-		 [ format(Format),
-		   base_uri(Base)
-		 | Options
-		 ]).
+	(   rdf_guess_format(Stream, Format, Options1)
+	->  print_message(informational, rdf_load_any(rdf(Base, Format))),
+	    set_stream(Stream, file_name(Base)),
+	    rdf_load(stream(Stream),
+		     [ format(Format),
+		       base_uri(Base)
+		     | Options
+		     ]),
+	    writeln(Options)
+	;   print_message(warning, rdf_load_any(no_rdf(Base))),
+	    fail
+	).
 
 %%	location_base(+Location, -BaseURI) is det.
 %
@@ -130,3 +159,15 @@ rdf_content_type('text/rdf+n3',		  turtle).	% Bit dubious
 rdf_content_type('text/html',		  html).
 rdf_content_type('application/xhtml+xml', xhtml).
 
+
+		 /*******************************
+		 *	      MESSAGES		*
+		 *******************************/
+
+:- multifile
+	prolog:message//1.
+
+prolog:message(rdf_load_any(rdf(Base, Format))) -->
+	[ 'RDF in ~q: ~q'-[Base, Format] ].
+prolog:message(rdf_load_any(no_rdf(Base))) -->
+	[ 'No RDF in ~q'-[Base] ].
