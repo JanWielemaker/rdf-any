@@ -135,8 +135,7 @@ archive_content(Ar, Entry, PipeLine, PipeTail) :-
 		->  !, RestPipe = PipeTail,
 		    Entry = Entry0
 		;   RestPipe = [ Pipe | RestPipe1 ],
-		    call_cleanup(content(Entry0, Entry, RestPipe1, PipeTail),
-				 close(Entry0))
+		    content(Entry0, Entry, true, RestPipe1, PipeTail)
 		)
 	    ;	fail
 	    )
