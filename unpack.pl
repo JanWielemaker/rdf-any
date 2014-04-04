@@ -81,8 +81,17 @@ open_input(Spec, In, file{path:Path}, true) :-
 	absolute_file_name(Spec, Path, [access(read)]),
 	open(Path, read, In, [type(binary)]).
 open_input(File, In, file{path:File}, true) :-
-	exists_file(File),
+	exists_file(File), !,
 	open(File, read, In, [type(binary)]).
+open_input(Pattern, In, Location, Close) :-
+	atom(Pattern),
+	expand_file_name(Pattern, Files),
+	Files \== [], Files \== [Pattern], !,
+	member(File, Files),
+	open_input(File, In, Location, Close).
+open_input(Input, _, _, _) :-
+	print_message(warning, unpack(cannot_open(Input))),
+	fail.
 
 http_scheme(http).
 http_scheme(https).
@@ -170,3 +179,13 @@ ssl_verify(_SSL,
            _ProblemCertificate, _AllCertificates, _FirstCertificate,
            _Error).
 
+
+		 /*******************************
+		 *	      MESSAGES		*
+		 *******************************/
+
+:- multifile
+	prolog:message//1.
+
+prolog:message(unpack(cannot_open(Spec))) -->
+	[ 'Unpack: cannot open ~p'-[Spec] ].
