@@ -57,9 +57,6 @@ open_input(URL, In, Meta, true) :-
 	uri_data(scheme, Components, Scheme),
 	nonvar(Scheme), !,
 	open_url(Scheme, URL, In, Meta).
-open_input(URL, In, file{path:File}, true) :-
-	uri_file_name(URL, File), !,
-	open(File, In, [type(binary)]).
 open_input(Spec, In, file{path:Path}, true) :-
 	compound(Spec), !,
 	absolute_file_name(Spec, Path, [access(read)]),
@@ -99,7 +96,7 @@ open_url(file, URL, In, Meta) :-
 	uri_file_name(URL, File),
 	Meta = file{path:File},
 	open(File, read, In, [type(binary)]).
-open_input(_, URL, _, _) :-
+open_url(_, URL, _, _) :-
 	print_message(warning, unpack(cannot_open(URL))),
 	fail.
 
