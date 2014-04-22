@@ -291,6 +291,11 @@ on_cdata(_CDATA, _Parser) :-
 skip_line --> eol, !.
 skip_line --> [_], skip_line.
 
+%%	icase_keyword(-Keyword)// is semidet.
+%
+%	True when Keyword is an atom representing a non-empty sequence of
+%	alphanumeric characters, converted to lowercase.
+
 icase_keyword(Keyword) -->
 	alpha_to_lower(H),
 	alpha_to_lowers(T),
@@ -298,8 +303,10 @@ icase_keyword(Keyword) -->
 	}.
 
 alpha_to_lowers([H|T]) -->
-	alpha_to_lower(H),
+	alpha_to_lower(H), !,
 	alpha_to_lowers(T).
+alpha_to_lowers([]) -->
+	[].
 
 %%	open_binary_string_stream(+String, -Stream) is det.
 %
