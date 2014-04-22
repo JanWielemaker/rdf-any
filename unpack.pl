@@ -47,32 +47,16 @@ unpack(Spec, Stream, Location) :-
 	Location = Meta.put(data, Data),
 	content(In, Stream, Data, CloseStream).
 
+%%	open_input(+Spec, -Stream, -MetaData, -Close) is semidet.
 
-open_input(stream(In), In, stream{stream:In}, false).
+open_input(stream(In), In, stream{stream:In}, false) :- !.
 open_input(In, In, stream{stream:In}, false) :-
 	is_stream(In), !.
 open_input(URL, In, Meta, true) :-
 	uri_components(URL, Components),
 	uri_data(scheme, Components, Scheme),
-	nonvar(Scheme),
-	(   http_scheme(Scheme)
-	->  rdf_extra_headers(Extra),
-	    http_open(URL, In,
-		      [ header(content_type, ContentType),
-			header(content_length, ContentLength),
-			header(last_modified, ModifiedText)
-		      | Extra
-		      ]),
-	    url_meta_pairs([ content_type=ContentType,
-			     content_length=ContentLength,
-			     last_modified=ModifiedText
-			   ], Pairs),
-	    dict_pairs(Meta, url, [url-URL|Pairs])
-	;   Scheme == file
-	->  uri_file_name(URL, File),
-	    Meta = file{path:File},
-	    open(File, read, In, [type(binary)])
-	).
+	nonvar(Scheme), !,
+	open_url(Scheme, URL, In, Meta).
 open_input(URL, In, file{path:File}, true) :-
 	uri_file_name(URL, File), !,
 	open(File, In, [type(binary)]).
@@ -91,6 +75,32 @@ open_input(Pattern, In, Location, Close) :-
 	open_input(File, In, Location, Close).
 open_input(Input, _, _, _) :-
 	print_message(warning, unpack(cannot_open(Input))),
+	fail.
+
+%%	open_url(+Scheme, +URL, -In, -MetaData) is semidet.
+%
+%	Helper for open_input/4 that deals with URLs
+
+open_url(Scheme, URL, In, Meta) :-
+	http_scheme(Scheme), !,
+	rdf_extra_headers(Extra),
+	http_open(URL, In,
+		  [ header(content_type, ContentType),
+		    header(content_length, ContentLength),
+		    header(last_modified, ModifiedText)
+		  | Extra
+		  ]),
+	url_meta_pairs([ content_type=ContentType,
+			 content_length=ContentLength,
+			 last_modified=ModifiedText
+		       ], Pairs),
+	dict_pairs(Meta, url, [url-URL|Pairs]).
+open_url(file, URL, In, Meta) :-
+	uri_file_name(URL, File),
+	Meta = file{path:File},
+	open(File, read, In, [type(binary)]).
+open_input(_, URL, _, _) :-
+	print_message(warning, unpack(cannot_open(URL))),
 	fail.
 
 http_scheme(http).
