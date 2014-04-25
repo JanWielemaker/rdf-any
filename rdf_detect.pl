@@ -62,12 +62,12 @@ turtle_like(Format, Options) -->
 	"BASE", blank, !,
 	turtle_or_trig(Format, Options).
 turtle_like(Format, Options) -->
-	iriref, nt_white, iriref, nt_white, nt_object,
-	nt_white,
+	iriref, 'nt_whites+', iriref, 'nt_whites+', nt_object,
+	'nt_whites+',
 	(   "."
 	->  nt_end,
 	    nt_turtle_like(Format, Options)
-	;   iriref, nt_white, nt_end
+	;   iriref, nt_end
 	->  {Format = nquads}
 	).
 turtle_like(Format, Options) -->		% starts with a blank node
@@ -145,6 +145,8 @@ iri_code -->
 	;   "U"
 	->  xdigit8
 	).
+iri_code -->
+	[_].
 
 langtag --> az, azs, sublangs.
 
@@ -190,11 +192,15 @@ string_code --> "\\", !,
 	).
 string_code --> [_].
 
-nt_white --> white, !, nt_white.
-nt_white, " " --> "#", string(_), ( eol1 ; eos ), !, nt_white.
+'nt_whites+' --> nt_white, 'nt_whites*'.
+'nt_whites*' --> nt_white, 'nt_whites*'.
+'nt_whites*' --> [].
+
+nt_white --> white, !.
+nt_white, " " --> "#", string(_), ( eol1 ; eos ), !.
 
 nt_end -->
-	nt_white,
+	'nt_whites+',
 	(   eol
 	->  []
 	;   eos
